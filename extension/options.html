@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meeting Prep — Options</title>
+  <style>
+    :root {
+      font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+      color: #202124;
+      background: #f8f9fa;
+    }
+    body {
+      max-width: 640px;
+      margin: 2rem auto;
+      padding: 0 1.5rem 3rem;
+    }
+    h1 { font-size: 1.35rem; font-weight: 600; }
+    label { display: block; font-weight: 500; margin-top: 1.25rem; margin-bottom: 0.35rem; }
+    input[type="url"], input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.5rem 0.65rem;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      font-size: 0.95rem;
+    }
+    .hint { font-size: 0.85rem; color: #5f6368; margin-top: 0.35rem; }
+    button {
+      margin-top: 1.25rem;
+      padding: 0.55rem 1rem;
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    button:hover { background: #1557b0; }
+    #status { margin-top: 1rem; font-size: 0.9rem; }
+    .ok { color: #137333; }
+    .err { color: #c5221f; }
+    pre {
+      background: #fff;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      padding: 0.75rem;
+      overflow: auto;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Meeting Prep</h1>
+  <p>Configure the backend URL used to generate and store meeting prep.</p>
+
+  <label for="baseUrl">Backend base URL</label>
+  <input type="url" id="baseUrl" placeholder="http://127.0.0.1:3847" autocomplete="off" />
+  <p class="hint">Example local dev: <code>http://127.0.0.1:3847</code> — no trailing slash.</p>
+
+  <label for="diag">Last diagnostics</label>
+  <pre id="diag">(none)</pre>
+
+  <button type="button" id="save">Save</button>
+  <button type="button" id="ping">Ping server health</button>
+  <div id="status"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>
