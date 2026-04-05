@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Meeting Prep API on AWS Lambda
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 29
+    MemorySize: 1024
+    Architectures:
+      - arm64
+    Environment:
+      Variables:
+        APP_ENV: production
+        PERSISTENCE: dynamo
+        AWS_REGION: !Ref AWS::Region
+        DYNAMODB_TABLE_NAME: !Ref MeetingPrepTable
+        CORS_ALLOWED_ORIGINS: !If
+          - HasExtraCorsOrigins
+          - !Join [",", [!Sub "chrome-extension://${ChromeExtensionId}", !Ref ExtraCorsAllowedOrigins]]
+          - !Sub "chrome-extension://${ChromeExtensionId}"
+        OPENAI_API_KEY: "{{resolve:secretsmanager:meeting-prep/prod:SecretString:OPENAI_API_KEY}}"
+        OPENAI_MODEL: gpt-4o-mini
+        TAVILY_API_KEY: "{{resolve:secretsmanager:meeting-prep/prod:SecretString:TAVILY_API_KEY}}"
+        SERPAPI_KEY: "{{resolve:secretsmanager:meeting-prep/prod:SecretString:SERPAPI_KEY}}"
+
+Parameters:
+  ChromeExtensionId:
+    Type: String
+    Description: >
+      Primary Chrome extension ID (32-char string from chrome://extensions or the Web Store), without the chrome-extension:// prefix.
+      When the extension is not published yet, use your unpacked extension ID here. After publishing, set this to the store ID and
+      move unpacked testers to ExtraCorsAllowedOrigins, or list both origins in ExtraCorsAllowedOrigins and keep this as the store ID.
+  ExtraCorsAllowedOrigins:
+    Type: String
+    Default: ""
+    Description: >
+      Optional comma-separated extra allowed CORS origins (full strings). Use for an unpacked developer build while the primary ID
+      is already the published ID, e.g. chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+Conditions:
+  HasExtraCorsOrigins: !Not [!Equals [!Ref ExtraCorsAllowedOrigins, ""]]
+
+Resources:
+  MeetingPrepApi:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: lambda.handler
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MeetingPrepTable
+
+  MeetingPrepTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+
+Outputs:
+  ApiUrl:
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  TableName:
+    Value: !Ref MeetingPrepTable

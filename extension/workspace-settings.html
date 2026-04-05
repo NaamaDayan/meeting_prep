@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Workspace Settings — Meeting Prep</title>
+  <style>
+    :root {
+      --ws-bg: #f9fafb;
+      --ws-surface: #ffffff;
+      --ws-elevated: #f3f4f6;
+      --ws-text: #111827;
+      --ws-muted: #6b7280;
+      --ws-border: #e5e7eb;
+      --ws-accent: #2563eb;
+      --ws-accent-hover: #1d4ed8;
+      --ws-radius: 14px;
+      --ws-radius-sm: 10px;
+      --ws-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 8px 28px rgba(0, 0, 0, 0.06);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--ws-text);
+      background: var(--ws-bg);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ws-bg: #0c0e12;
+        --ws-surface: #161a20;
+        --ws-elevated: #1e242d;
+        --ws-text: #f3f4f6;
+        --ws-muted: #9ca3af;
+        --ws-border: #2d3540;
+        --ws-accent: #3b82f6;
+        --ws-accent-hover: #60a5fa;
+        --ws-shadow: 0 4px 28px rgba(0, 0, 0, 0.45);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 0 22px 56px;
+    }
+
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding-top: 32px;
+    }
+
+    .btn-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--ws-border);
+      background: var(--ws-surface);
+      color: var(--ws-text);
+      font-size: 14px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      margin-bottom: 28px;
+      box-shadow: var(--ws-shadow);
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .btn-back:hover {
+      border-color: var(--ws-muted);
+      background: var(--ws-elevated);
+    }
+
+    .page-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin: 0 0 10px;
+      line-height: 1.2;
+    }
+
+    .page-sub {
+      margin: 0 0 36px;
+      color: var(--ws-muted);
+      font-size: 0.95rem;
+      max-width: 48ch;
+      line-height: 1.55;
+    }
+
+    .card {
+      background: var(--ws-surface);
+      border: 1px solid var(--ws-border);
+      border-radius: var(--ws-radius);
+      margin-bottom: 16px;
+      box-shadow: var(--ws-shadow);
+      overflow: hidden;
+    }
+
+    .sect-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .sect-icon svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .sect-icon--blue {
+      background: rgba(37, 99, 235, 0.12);
+      color: var(--ws-accent);
+    }
+
+    .sect-icon--amber {
+      background: rgba(245, 158, 11, 0.15);
+      color: #d97706;
+    }
+
+    .sect-icon--green {
+      background: rgba(16, 185, 129, 0.14);
+      color: #059669;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .sect-icon--blue { background: rgba(59, 130, 246, 0.2); color: var(--ws-accent); }
+      .sect-icon--amber { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+      .sect-icon--green { background: rgba(16, 185, 129, 0.18); color: #34d399; }
+    }
+
+    details.card > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      user-select: none;
+      transition: background 0.15s;
+    }
+
+    details.card > summary:hover {
+      background: var(--ws-elevated);
+    }
+
+    details.card > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .summary-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .summary-title {
+      font-weight: 600;
+      font-size: 1rem;
+      color: var(--ws-text);
+    }
+
+    details.card > summary::after {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-right: 2px solid var(--ws-muted);
+      border-bottom: 2px solid var(--ws-muted);
+      transform: rotate(45deg);
+      flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+
+    details.card[open] > summary::after {
+      transform: rotate(-135deg);
+      margin-top: 4px;
+    }
+
+    .accordion-body {
+      padding: 0 22px 22px;
+      border-top: 1px solid var(--ws-border);
+    }
+
+    .lbl {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--ws-muted);
+      margin-bottom: 8px;
+    }
+
+    .field {
+      margin-top: 18px;
+    }
+
+    .field:first-child {
+      margin-top: 0;
+    }
+
+    .field-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 560px) {
+      .field-row-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .hint {
+      font-size: 0.8125rem;
+      color: var(--ws-muted);
+      margin: 0 0 18px;
+      line-height: 1.5;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    textarea {
+      width: 100%;
+      padding: 11px 14px;
+      border-radius: var(--ws-radius-sm);
+      border: 1px solid var(--ws-border);
+      background: var(--ws-elevated);
+      color: var(--ws-text);
+      font: inherit;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    input:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--ws-accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--ws-accent) 22%, transparent);
+    }
+
+    @supports not (box-shadow: 0 0 0 3px color-mix(in srgb, red 22%, blue)) {
+      input:focus,
+      textarea:focus {
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+      }
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--ws-border);
+    }
+
+    .toggle-row:last-child {
+      border-bottom: none;
+    }
+
+    .toggle-label span {
+      display: block;
+      font-weight: 600;
+      font-size: 0.9375rem;
+    }
+
+    .toggle-label small {
+      display: block;
+      color: var(--ws-muted);
+      font-size: 0.8125rem;
+      margin-top: 3px;
+      font-weight: 400;
+    }
+
+    .switch {
+      position: relative;
+      width: 46px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .switch-slider {
+      position: absolute;
+      inset: 0;
+      background: var(--ws-border);
+      border-radius: 999px;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+
+    .switch-slider::before {
+      content: "";
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    }
+
+    .switch input:checked + .switch-slider {
+      background: var(--ws-accent);
+    }
+
+    .switch input:checked + .switch-slider::before {
+      transform: translateX(18px);
+    }
+
+    .switch input:focus-visible + .switch-slider {
+      outline: 2px solid var(--ws-accent);
+      outline-offset: 2px;
+    }
+
+    .inline-num {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .inline-num input[type="number"] {
+      width: 96px;
+    }
+
+    .card-static {
+      padding: 20px 22px 22px;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .card-head-title {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .card-head-title h2 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .section-intro {
+      color: var(--ws-muted);
+      font-size: 0.875rem;
+      margin: 0 0 18px;
+      line-height: 1.5;
+    }
+
+    .tpl-card {
+      background: var(--ws-elevated);
+      border: 1px solid var(--ws-border);
+      border-radius: var(--ws-radius-sm);
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .tpl-card textarea {
+      background: var(--ws-surface);
+      min-height: 120px;
+    }
+
+    .tpl-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .tpl-head input[type="text"] {
+      flex: 1;
+      background: var(--ws-surface);
+      font-weight: 600;
+    }
+
+    .icon-btn {
+      border: none;
+      background: transparent;
+      color: var(--ws-muted);
+      cursor: pointer;
+      padding: 8px;
+      border-radius: var(--ws-radius-sm);
+      line-height: 1;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .icon-btn:hover {
+      color: #dc2626;
+      background: rgba(220, 38, 38, 0.08);
+    }
+
+    .btn-add {
+      width: 100%;
+      padding: 12px;
+      border-radius: var(--ws-radius-sm);
+      border: 1px dashed var(--ws-border);
+      background: transparent;
+      color: var(--ws-accent);
+      font-weight: 600;
+      font-size: 0.9375rem;
+      font-family: inherit;
+      cursor: pointer;
+      margin-top: 6px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .btn-add:hover {
+      border-color: var(--ws-accent);
+      background: color-mix(in srgb, var(--ws-accent) 6%, transparent);
+    }
+
+    .btn-save {
+      width: 100%;
+      padding: 16px 20px;
+      border: none;
+      border-radius: var(--ws-radius);
+      background: var(--ws-accent);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      box-shadow: var(--ws-shadow);
+      margin-top: 8px;
+      transition: background 0.15s;
+    }
+
+    .btn-save:hover {
+      background: var(--ws-accent-hover);
+    }
+
+    .btn-save:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 8px 0;
+    }
+
+    .check-row input[type="checkbox"] {
+      margin-top: 4px;
+      width: 18px;
+      height: 18px;
+      accent-color: var(--ws-accent);
+    }
+
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(120px);
+      background: #111827;
+      color: #f9fafb;
+      padding: 12px 22px;
+      border-radius: 999px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      font-family: inherit;
+      box-shadow: var(--ws-shadow);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s;
+      z-index: 9999;
+    }
+
+    #toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      #toast {
+        background: #e5e7eb;
+        color: #111827;
+      }
+    }
+
+    .form-quiet-label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--ws-muted);
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <button type="button" class="btn-back" id="btnBack" aria-label="Back">
+      <span aria-hidden="true">←</span>
+      Back to Meeting Prep
+    </button>
+
+    <h1 class="page-title">Workspace Settings</h1>
+    <p class="page-sub">
+      Configure your personal context and reusable templates. These settings govern the sidebar, automation, and how prep is shared.
+    </p>
+
+    <details class="card" id="accContext">
+      <summary>
+        <div class="summary-left">
+          <span class="sect-icon sect-icon--blue" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </span>
+          <span class="summary-title">General context about me</span>
+        </div>
+      </summary>
+      <div class="accordion-body">
+        <p class="hint" style="margin-top:16px">
+          Used as background context for the AI when generating participant bios or meeting briefings. (AI wiring ships in a later release.)
+        </p>
+        <div class="field">
+          <label class="lbl" for="whatIDo">What I do</label>
+          <textarea id="whatIDo" rows="3" placeholder="e.g. I lead a sales team focused on enterprise tech"></textarea>
+        </div>
+        <div class="field-row-2 field" style="margin-top:18px">
+          <div>
+            <label class="lbl" for="jobTitle">Job title</label>
+            <input type="text" id="jobTitle" placeholder="e.g. Director of Sales" autocomplete="organization-title" />
+          </div>
+          <div>
+            <label class="lbl" for="myGoal">My goal</label>
+            <input type="text" id="myGoal" placeholder="e.g. Reduce sales cycle time" />
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details class="card" id="accSidebar">
+      <summary>
+        <div class="summary-left">
+          <span class="sect-icon sect-icon--amber" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          </span>
+          <span class="summary-title">Sidebar customization</span>
+        </div>
+      </summary>
+      <div class="accordion-body">
+        <p class="hint" style="margin-top:16px;margin-bottom:4px">
+          Turn off sections you do not use. Changes apply immediately in the Meeting Prep sidebar.
+        </p>
+        <div class="toggle-row">
+          <div class="toggle-label"><span>Agenda</span><small>Meeting agenda block</small></div>
+          <label class="switch"><input type="checkbox" id="mod_agenda" checked /><span class="switch-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-label"><span>Participants</span><small>Participants info</small></div>
+          <label class="switch"><input type="checkbox" id="mod_participants" checked /><span class="switch-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-label"><span>Meeting briefing</span><small>Shown in sidebar; used when emailing participants</small></div>
+          <label class="switch"><input type="checkbox" id="mod_briefing" checked /><span class="switch-slider"></span></label>
+        </div>
+      </div>
+    </details>
+
+    <div class="card card-static">
+      <div class="card-head">
+        <div class="card-head-title">
+          <span class="sect-icon sect-icon--amber" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+          </span>
+          <h2>Meeting templates</h2>
+        </div>
+      </div>
+      <p class="section-intro">Default agenda bullets per meeting type. (Selection in the sidebar can build on these later.)</p>
+      <div id="tplList"></div>
+      <button type="button" class="btn-add" id="btnAddTpl">+ Add template</button>
+    </div>
+
+    <div class="card card-static">
+      <div class="card-head">
+        <div class="card-head-title">
+          <span class="sect-icon sect-icon--green" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="m22 6-10 7L2 6"/></svg>
+          </span>
+          <h2>Delivery &amp; notifications</h2>
+        </div>
+      </div>
+      <p class="section-intro">Controls how the briefing pack is scheduled. Requires backend support for automation.</p>
+      <div class="toggle-row">
+        <div class="toggle-label"><span>Automatically send to myself</span><small>Email briefing pack before the meeting</small></div>
+        <label class="switch"><input type="checkbox" id="del_self" /><span class="switch-slider"></span></label>
+      </div>
+      <div class="inline-num">
+        <label class="form-quiet-label" for="del_self_min">Minutes before</label>
+        <input type="number" id="del_self_min" min="0" max="10080" value="15" />
+      </div>
+      <div class="toggle-row" style="margin-top:22px">
+        <div class="toggle-label"><span>Automatically send to all participants</span></div>
+        <label class="switch"><input type="checkbox" id="del_part" /><span class="switch-slider"></span></label>
+      </div>
+      <div class="inline-num">
+        <label class="form-quiet-label" for="del_part_min">Minutes before</label>
+        <input type="number" id="del_part_min" min="0" max="10080" value="30" />
+      </div>
+      <div class="field" style="margin-top:18px">
+        <label class="check-row">
+          <input type="checkbox" id="del_notify_edits" />
+          <span>Notify me for every edit the recipients did to the meeting prep page.</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="card card-static">
+      <div class="card-head">
+        <div class="card-head-title">
+          <span class="sect-icon sect-icon--green" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
+          </span>
+          <h2>Sharing defaults</h2>
+        </div>
+      </div>
+      <p class="section-intro">Master switch for automated meeting preparation email. Works with the delivery timers above.</p>
+      <div class="toggle-row" style="border-bottom:none;padding-bottom:0">
+        <div class="toggle-label"><span>Send meeting preparation automatically</span></div>
+        <label class="switch"><input type="checkbox" id="share_auto" /><span class="switch-slider"></span></label>
+      </div>
+    </div>
+
+    <button type="button" class="btn-save" id="btnSave">Save settings</button>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite">Settings saved</div>
+
+  <script src="workspaceSettingsShared.js"></script>
+  <script src="workspace-settings.js"></script>
+</body>
+</html>

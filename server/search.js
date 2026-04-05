@@ -1,11 +1,12 @@
 /**
  * Web search via Tavily (preferred) or SerpAPI fallback.
  */
+import { resolveEnvSecret } from "./secrets.js";
 
 export async function searchWeb(query, opts = {}) {
   const { maxResults = 6 } = opts;
-  const tavily = process.env.TAVILY_API_KEY;
-  const serp = process.env.SERPAPI_KEY;
+  const tavily = await resolveEnvSecret("TAVILY_API_KEY");
+  const serp = await resolveEnvSecret("SERPAPI_KEY");
 
   if (tavily) {
     const r = await fetch("https://api.tavily.com/search", {

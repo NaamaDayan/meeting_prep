@@ -1,13 +1,15 @@
 import { createFileAdapter } from "./fileAdapter.js";
 import { createDynamoAdapter } from "./dynamoAdapter.js";
+import { getConfig } from "../config.js";
 
 export function createPersistence() {
-  const mode = process.env.PERSISTENCE || "file";
+  const config = getConfig();
+  const mode = config.persistenceMode;
   if (mode === "dynamo") {
-    const table = process.env.DYNAMODB_TABLE_NAME;
+    const table = config.dynamoTableName;
     if (!table) throw new Error("DYNAMODB_TABLE_NAME is required for PERSISTENCE=dynamo");
-    return createDynamoAdapter(table);
+    return createDynamoAdapter(table, config.awsRegion);
   }
-  const filePath = process.env.MEETING_PREP_DEV_FILE || "data/preps.json";
+  const filePath = config.devFilePath;
   return createFileAdapter(filePath);
 }

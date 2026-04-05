@@ -1,25 +1,43 @@
-const DEFAULT_BASE = "http://127.0.0.1:3847";
-
 function $(id) {
   return document.getElementById(id);
 }
 
 async function load() {
-  const { meetingPrepBaseUrl, meetingPrepLastDiag } = await chrome.storage.sync.get([
-    "meetingPrepBaseUrl",
-    "meetingPrepLastDiag",
-  ]);
-  $("baseUrl").value = meetingPrepBaseUrl || DEFAULT_BASE;
-  $("diag").textContent =
-    meetingPrepLastDiag != null ? JSON.stringify(meetingPrepLastDiag, null, 2) : "(none)";
+  const settings = await MeetingPrepConfig.load();
+  try {
+    const id = chrome.runtime.id || "";
+    $("extensionId").value = id || "(unavailable)";
+    const origin = id ? `chrome-extension://${id}` : "chrome-extension://…";
+    $("extensionOriginHint").textContent = origin;
+  } catch {
+    $("extensionId").value = "(unavailable)";
+  }
+  $("mode").value = settings.mode;
+  $("devBaseUrl").value = settings.devBaseUrl;
+  $("prodBaseUrl").value = settings.prodBaseUrl;
+  $("activeBaseUrl").value = settings.activeBaseUrl;
+  $("diag").textContent = settings.lastDiag != null ? JSON.stringify(settings.lastDiag, null, 2) : "(none)";
+  try {
+    $("gmailRedirectUri").value = chrome.identity.getRedirectURL();
+  } catch {
+    $("gmailRedirectUri").value = "(open extension service worker and run: chrome.identity.getRedirectURL())";
+  }
+  $("gmailWebClientId").value = settings.gmailWebClientId || "";
+  $("briefingPublicBaseUrl").value = settings.briefingPublicBaseUrl || "";
 }
 
 $("save").addEventListener("click", async () => {
-  const base = $("baseUrl").value.trim().replace(/\/$/, "");
   $("status").textContent = "";
   $("status").className = "";
   try {
-    await chrome.storage.sync.set({ meetingPrepBaseUrl: base || DEFAULT_BASE });
+    const saved = await MeetingPrepConfig.save({
+      mode: $("mode").value,
+      devBaseUrl: $("devBaseUrl").value,
+      prodBaseUrl: $("prodBaseUrl").value,
+      gmailWebClientId: $("gmailWebClientId").value,
+      briefingPublicBaseUrl: $("briefingPublicBaseUrl").value,
+    });
+    $("activeBaseUrl").value = saved.activeBaseUrl;
     $("status").textContent = "Saved.";
     $("status").className = "ok";
   } catch (e) {
@@ -29,7 +47,15 @@ $("save").addEventListener("click", async () => {
 });
 
 $("ping").addEventListener("click", async () => {
-  const base = ($("baseUrl").value.trim().replace(/\/$/, "")) || DEFAULT_BASE;
+  const saved = await MeetingPrepConfig.save({
+    mode: $("mode").value,
+    devBaseUrl: $("devBaseUrl").value,
+    prodBaseUrl: $("prodBaseUrl").value,
+    gmailWebClientId: $("gmailWebClientId").value,
+    briefingPublicBaseUrl: $("briefingPublicBaseUrl").value,
+  });
+  const base = saved.activeBaseUrl;
+  $("activeBaseUrl").value = base;
   $("status").textContent = "Pinging…";
   $("status").className = "";
   try {

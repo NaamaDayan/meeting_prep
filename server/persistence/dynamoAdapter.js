@@ -1,5 +1,12 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+  DeleteCommand,
+  ScanCommand,
+  BatchWriteCommand,
+} from "@aws-sdk/lib-dynamodb";
 
 function makePk(userSub, eventId) {
   return `${userSub}#${encodeURIComponent(eventId)}`;
@@ -41,6 +48,33 @@ export function createDynamoAdapter(tableName, region) {
           Key: { pk },
         })
       );
+    },
+
+    async clearAll() {
+      let lastKey;
+      do {
+        const out = await client.send(
+          new ScanCommand({
+            TableName: tableName,
+            ProjectionExpression: "pk",
+            ExclusiveStartKey: lastKey,
+          })
+        );
+        const items = out.Items || [];
+        lastKey = out.LastEvaluatedKey;
+        for (let i = 0; i < items.length; i += 25) {
+          const chunk = items.slice(i, i + 25);
+          await client.send(
+            new BatchWriteCommand({
+              RequestItems: {
+                [tableName]: chunk.map((it) => ({
+                  DeleteRequest: { Key: { pk: it.pk } },
+                })),
+              },
+            })
+          );
+        }
+      } while (lastKey);
     },
   };
 }

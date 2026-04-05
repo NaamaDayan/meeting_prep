@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy Policy — Meeting Prep</title>
+  <style>
+    body { font-family: system-ui, Segoe UI, Roboto, sans-serif; line-height: 1.5; max-width: 42rem; margin: 2rem auto; padding: 0 1rem; color: #202124; }
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.1rem; margin-top: 1.75rem; }
+    p, li { font-size: 0.95rem; }
+    ul { padding-left: 1.25rem; }
+    .muted { color: #5f6368; font-size: 0.875rem; margin-top: 2rem; }
+    a { color: #1a73e8; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p><strong>Meeting Prep</strong> (the “Extension”) is a browser extension that helps you prepare for meetings using Google Calendar and related flows. This policy describes how the Extension and optional backend services handle information.</p>
+  <p class="muted">Last updated: <span id="date"></span></p>
+
+  <h2>Who we are</h2>
+  <p>Contact: <strong>namadayan@gmail.com</strong></p>
+  <p>If you operate a company name or website, add it here: <strong>meeting prep company</strong></p>
+
+  <h2>What the Extension does</h2>
+  <ul>
+    <li>Reads meeting-related context from Google Calendar (and Gmail where you use supported features), such as event titles, times, and participant names or email addresses visible in the interface.</li>
+    <li>Lets you generate or load structured meeting preparation text (for example participant summaries, agenda ideas, and suggested questions).</li>
+    <li>May send meeting context and your Google OAuth access token to a <strong>backend server you configure</strong> in the Extension options (development or production URL), so the server can verify your identity and store or generate prep associated with your account.</li>
+    <li>Uses Chrome storage to save settings (such as backend URLs), optional diagnostics from the options page, and a local cache of prep to improve performance.</li>
+    <li>Uses scheduled background tasks (alarms) to refresh cached prep for upcoming events.</li>
+  </ul>
+
+  <h2>Information we process</h2>
+  <p>Depending on how you use the Extension, this may include:</p>
+  <ul>
+    <li><strong>Google account identity</strong>: The Extension uses Google sign-in via Chrome. Your backend may verify the same Google-issued token to identify you (for example a stable user identifier from Google).</li>
+    <li><strong>Meeting and participant details</strong>: Titles, times, attendee names and email addresses, and similar details needed to create prep.</li>
+    <li><strong>User-edited prep text</strong>: Text you save in the Extension may be stored on your configured backend.</li>
+    <li><strong>Technical data</strong>: Your configured server may log standard request metadata (such as timestamps or IP addresses) as part of normal operation and security.</li>
+  </ul>
+  <p>We do not sell your personal information. We do not use this data for advertising in the Extension.</p>
+
+  <h2>Third parties</h2>
+  <ul>
+    <li><strong>Google</strong>: The Extension uses Google APIs and OAuth as described in your Google account and Google’s policies.</li>
+    <li><strong>Your backend</strong>: Data you send to your configured API URL is processed under your (or your organization’s) control. Replace this paragraph with your hosting provider and data retention rules if you offer a shared service.</li>
+    <li>If your backend uses an AI provider (for example OpenAI) or search APIs, describe that here: <strong>gpt-4o-mini and gpt-5.4-nano models are used for generating meeting preps.</strong></li>
+  </ul>
+
+  <h2>Data retention</h2>
+  <p>Local Extension data remains on your device until you remove the Extension or clear Extension data. Data on your backend is retained according to your backend’s configuration. <strong>Data is retained for 3 days on the server</strong></p>
+
+  <h2>Your choices</h2>
+  <ul>
+    <li>You can stop using the Extension at any time by removing it from Chrome.</li>
+    <li>You can change or disconnect the backend URL in the Extension options.</li>
+    <li>You can revoke the Extension’s access to Google from your Google Account security settings.</li>
+  </ul>
+
+  <h2>Children</h2>
+  <p>The Extension is not directed at children under 13 (or the age required in your jurisdiction). Do not use it if you are not old enough to agree to these terms in your region.</p>
+
+  <h2>Changes</h2>
+  <p>We may update this policy. The “Last updated” date will change when we do. Continued use after changes means you accept the updated policy.</p>
+
+  <h2>Contact</h2>
+  <p>Questions: <strong>namadayan@gmail.com</strong></p>
+
+  <script>
+    document.getElementById("date").textContent = new Date().toISOString().slice(0, 10);
+  </script>
+</body>
+</html>

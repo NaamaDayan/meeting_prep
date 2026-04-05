@@ -52,11 +52,62 @@
 </head>
 <body>
   <h1>Meeting Prep</h1>
-  <p>Configure the backend URL used to generate and store meeting prep.</p>
+  <p style="margin-bottom:1.25rem">
+    <a href="workspace-settings.html?from=options" style="color:#1a73e8;font-weight:600;text-decoration:none"
+      >Workspace settings</a>
+    <span style="color:#5f6368;font-weight:400"> — sidebar sections, templates, delivery, and sharing defaults.</span>
+  </p>
+  <p>
+    Configure two backend URL slots, then pick which slot is active. <strong>Development</strong> and <strong>Production</strong> here mean
+    <em>which server URL to use</em>, not whether this extension build is unpacked or from the Web Store. Use <strong>Production</strong> with your
+    AWS URL when the API is remote, even if you are still loading this extension unpacked.
+  </p>
 
-  <label for="baseUrl">Backend base URL</label>
-  <input type="url" id="baseUrl" placeholder="http://127.0.0.1:3847" autocomplete="off" />
-  <p class="hint">Example local dev: <code>http://127.0.0.1:3847</code> — no trailing slash.</p>
+  <label for="extensionId">This extension’s ID (for server CORS)</label>
+  <input type="text" id="extensionId" readonly style="font-family:ui-monospace,monospace;font-size:12px" />
+  <p class="hint">
+    If your API runs on AWS with <code>APP_ENV=production</code>, add the origin
+    <code id="extensionOriginHint">chrome-extension://…</code> to the server’s <code>CORS_ALLOWED_ORIGINS</code> (comma-separated with any other origins).
+    Unpacked and Web Store builds have different IDs.
+  </p>
+
+  <label for="mode">Active backend slot</label>
+  <select id="mode" style="width:100%;padding:0.5rem 0.65rem;border:1px solid #dadce0;border-radius:8px;font-size:0.95rem">
+    <option value="dev">Development (local / dev URL)</option>
+    <option value="prod">Production (remote / prod URL)</option>
+  </select>
+
+  <label for="devBaseUrl">Development backend URL</label>
+  <input type="url" id="devBaseUrl" placeholder="http://127.0.0.1:3847" autocomplete="off" />
+  <p class="hint">Typically <code>http://127.0.0.1:3847</code> when the Node server runs on your machine.</p>
+
+  <label for="prodBaseUrl">Production backend URL</label>
+  <input type="url" id="prodBaseUrl" placeholder="https://api.example.com" autocomplete="off" />
+  <p class="hint">Your deployed API (API Gateway or custom domain). Use this slot whenever the active mode above is Production.</p>
+
+  <label for="briefingPublicBaseUrl">Public briefing page base URL (production only, optional)</label>
+  <input type="url" id="briefingPublicBaseUrl" placeholder="https://app.example.com/briefing" autocomplete="off" />
+  <p class="hint">
+    If set, “Send Briefing” emails use <code>…/briefing/&lt;meeting-id&gt;</code> under this base. If empty, the link defaults to
+    <code>&lt;production backend URL&gt;/briefing/&lt;meeting-id&gt;</code> (your API must serve that route).
+  </p>
+
+  <label for="activeBaseUrl">Currently active backend URL</label>
+  <input type="text" id="activeBaseUrl" readonly style="font-family:ui-monospace,monospace;font-size:12px" />
+
+  <h2 style="font-size:1.1rem;margin-top:2rem;font-weight:600">Send briefing (Gmail)</h2>
+  <p class="hint">
+    “Send briefing” uses a separate Google sign-in. The OAuth client type <strong>Chrome extension</strong> does not register redirect URIs for that flow, which causes <code>redirect_uri_mismatch</code>.
+    Create a second client: <strong>OAuth 2.0 → Web application</strong>, then under <strong>Authorized redirect URIs</strong> add the value below <em>exactly</em> (copy/paste).
+  </p>
+  <label for="gmailRedirectUri">Your redirect URI (paste this in Google Cloud)</label>
+  <input type="text" id="gmailRedirectUri" readonly style="font-family:ui-monospace,monospace;font-size:12px" />
+  <label for="gmailWebClientId">Web application client ID</label>
+  <input type="text" id="gmailWebClientId" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off" />
+  <p class="hint">
+    From Google Cloud → Credentials → your <strong>Web application</strong> OAuth client (not the Chrome extension client). Same Google Cloud project as the extension.
+    Under <strong>APIs &amp; Services → OAuth consent screen → Scopes</strong>, include <code>…/auth/gmail.send</code> and <code>…/auth/userinfo.email</code> (Send Briefing needs both so the app can read the sending address; <code>gmail.send</code> alone cannot call Gmail’s profile API).
+  </p>
 
   <label for="diag">Last diagnostics</label>
   <pre id="diag">(none)</pre>
@@ -65,6 +116,7 @@
   <button type="button" id="ping">Ping server health</button>
   <div id="status"></div>
 
+  <script src="runtimeConfig.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

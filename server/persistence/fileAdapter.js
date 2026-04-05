@@ -46,5 +46,9 @@ export function createFileAdapter(filePath) {
       delete db.records[pk];
       await writeAll(db);
     },
+
+    async clearAll() {
+      await writeAll({ records: {} });
+    },
   };
 }

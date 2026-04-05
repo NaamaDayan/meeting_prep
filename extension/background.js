@@ -1,11 +1,9 @@
-importScripts("calendarIds.js");
+importScripts("calendarIds.js", "runtimeConfig.js", "workspaceSettingsShared.js");
 
 /**
  * Meeting Prep — service worker: OAuth, Calendar API, backend HTTP, message router.
  * Content script never talks to the server or Calendar API directly.
  */
-
-const DEFAULT_BASE = "http://127.0.0.1:3847";
 
 const PREP_CACHE_KEY = "mp_prep_cache_v1";
 const MAX_CACHE_EVENTS = 200;
@@ -17,13 +15,21 @@ const MSG = {
   AUTO_SYNC_EVENT: "AUTO_SYNC_EVENT",
   FETCH_EVENT: "FETCH_EVENT",
   SAVE_PREP_EDITS: "SAVE_PREP_EDITS",
+  SAVE_PARTICIPANT_FIX: "SAVE_PARTICIPANT_FIX",
   REFRESH_PREP_CACHE: "REFRESH_PREP_CACHE",
+  SEND_EMAIL: "SEND_EMAIL",
+  WORKSPACE_SETTINGS_GET: "WORKSPACE_SETTINGS_GET",
+  WORKSPACE_SETTINGS_SAVE: "WORKSPACE_SETTINGS_SAVE",
+  OPEN_WORKSPACE_SETTINGS: "OPEN_WORKSPACE_SETTINGS",
+  OPEN_BRIEFING_PREVIEW: "OPEN_BRIEFING_PREVIEW",
+  STASH_BRIEFING_PREVIEW: "STASH_BRIEFING_PREVIEW",
+  PREP_SESSION_SYNC: "PREP_SESSION_SYNC",
+  PARTICIPANT_REGENERATE: "PARTICIPANT_REGENERATE",
 };
 
 async function getBaseUrl() {
-  const { meetingPrepBaseUrl } = await chrome.storage.sync.get("meetingPrepBaseUrl");
-  const base = (meetingPrepBaseUrl || DEFAULT_BASE).replace(/\/$/, "");
-  return base;
+  const settings = await MeetingPrepConfig.load();
+  return settings.activeBaseUrl;
 }
 
 async function getAuthToken(interactive) {
@@ -37,6 +43,15 @@ async function getAuthToken(interactive) {
       resolve(token);
     });
   });
+}
+
+/** Prefer cached token so Calendar + backend flows don't block on OAuth unless needed. */
+async function getAuthTokenPreferCached() {
+  try {
+    return await getAuthToken(false);
+  } catch {
+    return await getAuthToken(true);
+  }
 }
 
 async function removeCachedAuthToken() {
@@ -54,6 +69,140 @@ async function fetchUserIdentity(accessToken) {
   });
   if (!r.ok) throw new Error(`userinfo failed: ${r.status}`);
   return r.json();
+}
+
+/**
+ * Gmail send uses launchWebAuthFlow. The Chrome-extension-type OAuth client does NOT accept
+ * that redirect_uri for this flow — use a separate "Web application" client ID (see options page)
+ * with Authorized redirect URI = chrome.identity.getRedirectURL() exactly.
+ */
+async function getGmailWebOAuthClientId() {
+  const { meetingPrepGmailWebClientId } = await chrome.storage.sync.get("meetingPrepGmailWebClientId");
+  const id = String(meetingPrepGmailWebClientId || "").trim();
+  if (id) return id;
+  return chrome.runtime.getManifest().oauth2.client_id;
+}
+
+/**
+ * Gmail send scope is NOT in manifest oauth2.scopes so "Prep meeting" never waits on Gmail consent.
+ * User authorizes Gmail only when sending email (separate token via web auth flow).
+ */
+/** Scopes for Send Briefing: send mail + read account email (same token). `gmail.send` alone does NOT allow `users/me/profile` → 403. */
+const GMAIL_SEND_AUTH_SCOPES = [
+  "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/userinfo.email",
+].join(" ");
+
+async function getGmailAccessTokenViaWebAuthFlow() {
+  const clientId = await getGmailWebOAuthClientId();
+  const redirectUri = chrome.identity.getRedirectURL();
+  const scope = encodeURIComponent(GMAIL_SEND_AUTH_SCOPES);
+  const authUrl =
+    `https://accounts.google.com/o/oauth2/v2/auth?` +
+    `client_id=${encodeURIComponent(clientId)}` +
+    `&response_type=token` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&scope=${scope}`;
+  return new Promise((resolve, reject) => {
+    chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, (redirectedTo) => {
+      const err = chrome.runtime.lastError;
+      if (err) {
+        reject(new Error(err.message));
+        return;
+      }
+      if (!redirectedTo) {
+        reject(new Error("no_redirect"));
+        return;
+      }
+      try {
+        const u = new URL(redirectedTo);
+        const oauthErr = u.searchParams.get("error");
+        if (oauthErr) {
+          reject(new Error(u.searchParams.get("error_description") || oauthErr));
+          return;
+        }
+        const frag = u.hash && u.hash.startsWith("#") ? u.hash.slice(1) : "";
+        const params = new URLSearchParams(frag);
+        const token = params.get("access_token");
+        if (!token) reject(new Error("no_access_token"));
+        else resolve(token);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+}
+
+async function fetchSenderEmailForGmail(accessToken) {
+  const r = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!r.ok) {
+    const hint = r.status === 403 ? " (add userinfo.email to this client’s scopes / re-authorize)" : "";
+    throw new Error(`userinfo failed: ${r.status}${hint}`);
+  }
+  const j = await r.json();
+  return normalizeEmail(j.email || "");
+}
+
+function base64UrlEncodeBytes(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  const b64 = btoa(bin);
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+/**
+ * Gmail API expects a base64url-encoded RFC 822 message (UTF-8).
+ */
+function buildGmailRawMessage({ fromEmail, toEmails, subject, bodyText }) {
+  const to = (toEmails || []).map((e) => normalizeEmail(e)).filter(Boolean).join(", ");
+  const subj = String(subject || "").replace(/\r?\n/g, " ").trim();
+  const from = normalizeEmail(fromEmail) || "me";
+  const body = String(bodyText || "").replace(/\r\n/g, "\n");
+
+  const msg =
+    `From: ${from}\r\n` +
+    `To: ${to}\r\n` +
+    `Subject: ${subj}\r\n` +
+    "MIME-Version: 1.0\r\n" +
+    'Content-Type: text/plain; charset=UTF-8\r\n' +
+    "Content-Transfer-Encoding: 8bit\r\n" +
+    "\r\n" +
+    body;
+
+  return base64UrlEncodeBytes(new TextEncoder().encode(msg));
+}
+
+async function gmailSendMessage(accessToken, raw) {
+  const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ raw }),
+  });
+  if (!r.ok) {
+    const t = await r.text();
+    throw new Error(`gmail send failed: ${r.status} ${t}`);
+  }
+  return r.json();
+}
+
+async function handleSendEmail(payload) {
+  const toEmails = Array.isArray(payload?.toEmails) ? payload.toEmails : [];
+  const subject = String(payload?.subject || "").trim();
+  const bodyText = String(payload?.body || "").trim();
+  if (!toEmails.length) return { ok: false, error: "no_recipients" };
+  if (!subject) return { ok: false, error: "no_subject" };
+  if (!bodyText) return { ok: false, error: "no_body" };
+
+  const accessToken = await getGmailAccessTokenViaWebAuthFlow();
+  const fromEmail = await fetchSenderEmailForGmail(accessToken);
+  const raw = buildGmailRawMessage({ fromEmail, toEmails, subject, bodyText });
+  const sent = await gmailSendMessage(accessToken, raw);
+  return { ok: true, id: sent?.id || null };
 }
 
 function normalizeEmail(e) {
@@ -310,20 +459,105 @@ async function resolveCalendarEvent(accessToken, calendarIdHint, eventId, snapsh
 
 async function serverFetch(path, options = {}) {
   const base = await getBaseUrl();
-  const token = await getAuthToken(true);
+  let token = await getAuthTokenPreferCached();
   const headers = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
     ...(options.headers || {}),
   };
-  let r = await fetch(`${base}${path}`, { ...options, headers });
+  const controller = new AbortController();
+  const timeoutMs = 120000;
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  let r;
+  try {
+    r = await fetch(`${base}${path}`, { ...options, headers, signal: controller.signal });
+  } finally {
+    clearTimeout(t);
+  }
   if (r.status === 401) {
     await removeCachedAuthToken();
     const token2 = await getAuthToken(true);
     headers.Authorization = `Bearer ${token2}`;
-    r = await fetch(`${base}${path}`, { ...options, headers });
+    const c2 = new AbortController();
+    const t2 = setTimeout(() => c2.abort(), timeoutMs);
+    try {
+      r = await fetch(`${base}${path}`, { ...options, headers, signal: c2.signal });
+    } finally {
+      clearTimeout(t2);
+    }
   }
   return r;
+}
+
+async function workspaceSettingsFetch(path, options = {}) {
+  const base = await getBaseUrl();
+  let token = await getAuthTokenPreferCached();
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+    ...(options.headers || {}),
+  };
+  const controller = new AbortController();
+  const timeoutMs = 60000;
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  let r;
+  try {
+    r = await fetch(`${base}${path}`, { ...options, headers, signal: controller.signal });
+  } finally {
+    clearTimeout(t);
+  }
+  if (r.status === 401) {
+    await removeCachedAuthToken();
+    const token2 = await getAuthToken(true);
+    headers.Authorization = `Bearer ${token2}`;
+    const c2 = new AbortController();
+    const t2 = setTimeout(() => c2.abort(), timeoutMs);
+    try {
+      r = await fetch(`${base}${path}`, { ...options, headers, signal: c2.signal });
+    } finally {
+      clearTimeout(t2);
+    }
+  }
+  return r;
+}
+
+async function handleWorkspaceSettingsGet() {
+  const r = await workspaceSettingsFetch("/workspace-settings", { method: "GET" });
+  const text = await r.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = {};
+  }
+  if (!r.ok) {
+    return { ok: false, status: r.status, message: data.message || text || "get_failed" };
+  }
+  const merged = MPWorkspaceSettings.merge(data.settings || {});
+  await MPWorkspaceSettings.saveLocal(merged, { preserveUpdatedAt: true });
+  return { ok: true, settings: merged };
+}
+
+async function handleWorkspaceSettingsSave(payload) {
+  const raw = payload?.settings != null ? payload.settings : payload;
+  const mergedLocal = MPWorkspaceSettings.merge(raw || {});
+  const r = await workspaceSettingsFetch("/workspace-settings", {
+    method: "PUT",
+    body: JSON.stringify({ settings: mergedLocal }),
+  });
+  const text = await r.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = {};
+  }
+  if (!r.ok) {
+    return { ok: false, status: r.status, message: data.message || text || "save_failed" };
+  }
+  const saved = MPWorkspaceSettings.merge(data.settings || mergedLocal);
+  await MPWorkspaceSettings.saveLocal(saved, { preserveUpdatedAt: true });
+  return { ok: true, settings: saved };
 }
 
 function emptyPrepCache() {
@@ -498,7 +732,7 @@ async function getOrganizerEmailFallback() {
 }
 
 async function handlePrepMeeting(payload) {
-  const accessToken = await getAuthToken(true);
+  const accessToken = await getAuthTokenPreferCached();
 
   const calendarEventId = payload.calendarEventId || null;
   const calendarId = payload.calendarId || "primary";
@@ -532,6 +766,12 @@ async function handlePrepMeeting(payload) {
     return { ok: false, error: "needs_input", message: "Add a title or attendees before generating prep." };
   }
 
+  const meetingDescriptionRaw =
+    payload.meetingDescription != null
+      ? String(payload.meetingDescription)
+      : payload.description != null
+        ? String(payload.description)
+        : "";
   const body = {
     calendarEventId: resolvedEventId || undefined,
     calendarId,
@@ -539,6 +779,9 @@ async function handlePrepMeeting(payload) {
     participants,
     organizerEmail: normalizeEmail(organizerEmail) || undefined,
     startIso: payload.startIso || undefined,
+    meetingDescription: meetingDescriptionRaw
+      ? meetingDescriptionRaw.slice(0, 16000)
+      : undefined,
   };
 
   const r = await serverFetch("/manual-prep", {
@@ -571,14 +814,18 @@ async function handlePrepMeeting(payload) {
       data.eventId,
     ]);
     await registerPrepAliases(data.eventId, hints);
+    const mergedText = data.merged != null ? data.merged : data.prep;
     await putPrepCacheEntry(data.eventId, {
       hasPrep: true,
       prepPayload: {
         eventId: data.eventId,
-        prep: data.prep,
-        merged: data.prep,
+        prep: mergedText,
+        merged: mergedText,
         title: body.title,
         meta: data.meta || {},
+        participantsResolved: data.participantsResolved || [],
+        sidebarState: data.sidebarState || null,
+        workspaceTemplates: data.workspaceTemplates || [],
       },
     });
   }
@@ -686,6 +933,134 @@ async function handleSavePrepEdits(payload) {
         eventId,
         merged: data.merged,
         prep: prev.prep || data.merged,
+        participantsResolved: prev.participantsResolved,
+      },
+    });
+    await registerPrepAliases(eventId, [eventId]);
+  } catch {
+    /* ignore cache update errors */
+  }
+  return { ok: true, ...data };
+}
+
+async function handlePrepSessionSync(payload) {
+  const eventId = payload.calendarEventId;
+  if (!eventId) return { ok: false, error: "no_event_id" };
+  const r = await serverFetch(`/prep/${encodeURIComponent(eventId)}/session`, {
+    method: "PUT",
+    body: JSON.stringify({
+      edits: payload.edits || {},
+      sidebarState: payload.sidebarState,
+      meetingDescription: payload.meetingDescription,
+    }),
+  });
+  const text = await r.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { raw: text };
+  }
+  if (!r.ok) {
+    return { ok: false, status: r.status, message: data.message || text };
+  }
+  try {
+    const cache = await loadPrepCache();
+    const prev = cache.byCanonicalId[eventId]?.prepPayload || {};
+    await putPrepCacheEntry(eventId, {
+      hasPrep: true,
+      prepPayload: {
+        ...prev,
+        eventId,
+        merged: data.merged,
+        prep: prev.prep || data.merged,
+        sidebarState: data.sidebarState != null ? data.sidebarState : prev.sidebarState,
+        workspaceTemplates: data.workspaceTemplates || prev.workspaceTemplates,
+        participantsResolved: prev.participantsResolved,
+        meta: data.meta || prev.meta,
+      },
+    });
+    await registerPrepAliases(eventId, [eventId]);
+  } catch {
+    /* ignore */
+  }
+  return { ok: true, ...data };
+}
+
+async function handleParticipantRegenerate(payload) {
+  const eventId = payload.calendarEventId;
+  if (!eventId) return { ok: false, error: "no_event_id" };
+  const r = await serverFetch(`/prep/${encodeURIComponent(eventId)}/participant-regenerate`, {
+    method: "POST",
+    body: JSON.stringify(payload.card || {}),
+  });
+  const text = await r.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { raw: text };
+  }
+  if (!r.ok) {
+    return { ok: false, status: r.status, message: data.message || text };
+  }
+  try {
+    const cache = await loadPrepCache();
+    const prev = cache.byCanonicalId[eventId]?.prepPayload || {};
+    await putPrepCacheEntry(eventId, {
+      hasPrep: true,
+      prepPayload: {
+        ...prev,
+        eventId,
+        sidebarState: data.sidebarState || prev.sidebarState,
+      },
+    });
+    await registerPrepAliases(eventId, [eventId]);
+  } catch {
+    /* ignore */
+  }
+  return { ok: true, ...data };
+}
+
+async function handleSaveParticipantFix(payload) {
+  const eventId = payload.calendarEventId;
+  if (!eventId) return { ok: false, error: "no_event_id" };
+  const r = await serverFetch(`/prep/${encodeURIComponent(eventId)}/participant-fix`, {
+    method: "PUT",
+    body: JSON.stringify({
+      email: payload.email,
+      name: payload.name,
+      linkedinUrl: payload.linkedinUrl,
+      company: payload.company != null ? payload.company : "",
+    }),
+  });
+  const text = await r.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { raw: text };
+  }
+  if (!r.ok) {
+    return {
+      ok: false,
+      status: r.status,
+      error: data.error || "server_error",
+      message: data.message || text,
+    };
+  }
+  try {
+    const cache = await loadPrepCache();
+    const prev = cache.byCanonicalId[eventId]?.prepPayload || {};
+    await putPrepCacheEntry(eventId, {
+      hasPrep: true,
+      prepPayload: {
+        ...prev,
+        eventId,
+        prep: data.prep,
+        merged: data.merged,
+        participantsResolved: data.participantsResolved || [],
+        meta: data.meta || prev.meta || {},
       },
     });
     await registerPrepAliases(eventId, [eventId]);
@@ -717,8 +1092,9 @@ async function handleFetchEvent(payload) {
   };
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const run = async () => {
+    const _sender = sender;
     try {
       if (message?.type === MSG.PREP_MEETING) {
         return await handlePrepMeeting(message.payload || {});
@@ -732,8 +1108,53 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message?.type === MSG.SAVE_PREP_EDITS) {
         return await handleSavePrepEdits(message.payload || {});
       }
+      if (message?.type === MSG.SAVE_PARTICIPANT_FIX) {
+        return await handleSaveParticipantFix(message.payload || {});
+      }
       if (message?.type === MSG.REFRESH_PREP_CACHE) {
         await runProactivePrepSync();
+        return { ok: true };
+      }
+      if (message?.type === MSG.SEND_EMAIL) {
+        return await handleSendEmail(message.payload || {});
+      }
+      if (message?.type === MSG.WORKSPACE_SETTINGS_GET) {
+        return await handleWorkspaceSettingsGet();
+      }
+      if (message?.type === MSG.WORKSPACE_SETTINGS_SAVE) {
+        return await handleWorkspaceSettingsSave(message.payload || {});
+      }
+      if (message?.type === MSG.PREP_SESSION_SYNC) {
+        return await handlePrepSessionSync(message.payload || {});
+      }
+      if (message?.type === MSG.PARTICIPANT_REGENERATE) {
+        return await handleParticipantRegenerate(message.payload || {});
+      }
+      if (message?.type === MSG.OPEN_WORKSPACE_SETTINGS) {
+        const fromRaw = String(message.payload?.from || "sidebar");
+        const from = fromRaw === "options" ? "options" : "sidebar";
+        const url = chrome.runtime.getURL(`workspace-settings.html?from=${encodeURIComponent(from)}`);
+        const openerTabId = _sender.tab?.id;
+        if (from === "sidebar" && openerTabId != null && chrome.storage.session) {
+          await chrome.storage.session.set({ mp_workspace_settings_opener_tab_id: openerTabId });
+        }
+        await chrome.tabs.create({ url });
+        return { ok: true };
+      }
+      if (message?.type === MSG.STASH_BRIEFING_PREVIEW) {
+        const payload = message.payload;
+        if (payload && typeof payload === "object" && chrome.storage?.session) {
+          await chrome.storage.session.set({ mp_briefing_preview_v1: payload });
+        }
+        return { ok: true };
+      }
+      if (message?.type === MSG.OPEN_BRIEFING_PREVIEW) {
+        const payload = message.payload;
+        if (payload && typeof payload === "object" && chrome.storage?.session) {
+          await chrome.storage.session.set({ mp_briefing_preview_v1: payload });
+        }
+        const url = chrome.runtime.getURL("briefing-preview.html");
+        await chrome.tabs.create({ url });
         return { ok: true };
       }
       return { ok: false, error: "unknown_message" };
