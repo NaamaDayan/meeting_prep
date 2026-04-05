@@ -2,7 +2,8 @@ const MeetingPrepConfig = (() => {
   const DEFAULTS = {
     mode: "dev",
     devBaseUrl: "http://127.0.0.1:3847",
-    prodBaseUrl: "https://api.example.com",
+    prodBaseUrl: "https://nqhzxxqnhb.execute-api.eu-central-1.amazonaws.com",
+    gmailWebClientId: "576372766248-p83f6sk6s2mc1smn96vajjba16fi0nvp.apps.googleusercontent.com",
   };
 
   function normalizeMode(value) {
@@ -49,7 +50,8 @@ const MeetingPrepConfig = (() => {
       prodBaseUrl,
       activeBaseUrl: mode === "prod" ? prodBaseUrl : devBaseUrl,
       lastDiag: stored.meetingPrepLastDiag || null,
-      gmailWebClientId: String(stored.meetingPrepGmailWebClientId || "").trim(),
+      gmailWebClientId:
+        String(stored.meetingPrepGmailWebClientId || "").trim() || DEFAULTS.gmailWebClientId,
       briefingPublicBaseUrl: normalizeBaseUrl(stored.meetingPrepBriefingPublicBaseUrl || "", ""),
     };
   }

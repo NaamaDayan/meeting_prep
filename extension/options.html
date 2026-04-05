@@ -82,7 +82,7 @@
   <p class="hint">Typically <code>http://127.0.0.1:3847</code> when the Node server runs on your machine.</p>
 
   <label for="prodBaseUrl">Production backend URL</label>
-  <input type="url" id="prodBaseUrl" placeholder="https://api.example.com" autocomplete="off" />
+  <input type="url" id="prodBaseUrl" placeholder="https://nqhzxxqnhb.execute-api.eu-central-1.amazonaws.com" autocomplete="off" />
   <p class="hint">Your deployed API (API Gateway or custom domain). Use this slot whenever the active mode above is Production.</p>
 
   <label for="briefingPublicBaseUrl">Public briefing page base URL (production only, optional)</label>
@@ -103,7 +103,7 @@
   <label for="gmailRedirectUri">Your redirect URI (paste this in Google Cloud)</label>
   <input type="text" id="gmailRedirectUri" readonly style="font-family:ui-monospace,monospace;font-size:12px" />
   <label for="gmailWebClientId">Web application client ID</label>
-  <input type="text" id="gmailWebClientId" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off" />
+  <input type="text" id="gmailWebClientId" placeholder="576372766248-p83f6sk6s2mc1smn96vajjba16fi0nvp.apps.googleusercontent.com" autocomplete="off" />
   <p class="hint">
     From Google Cloud → Credentials → your <strong>Web application</strong> OAuth client (not the Chrome extension client). Same Google Cloud project as the extension.
     Under <strong>APIs &amp; Services → OAuth consent screen → Scopes</strong>, include <code>…/auth/gmail.send</code> and <code>…/auth/userinfo.email</code> (Send Briefing needs both so the app can read the sending address; <code>gmail.send</code> alone cannot call Gmail’s profile API).

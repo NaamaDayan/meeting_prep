@@ -1,3 +1,9 @@
 node_modules/
 server/.env
+server/.enrichment-cache.json
 dist/
+meeting_prep_prototype-lambda.zip
+client/.env
+client/.env.local
+client/.env.production
+client/.env.production.local

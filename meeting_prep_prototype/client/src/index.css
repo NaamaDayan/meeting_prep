@@ -356,6 +356,59 @@ body {
   min-height: 56px;
 }
 
+.form-select {
+  width: 100%;
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.form-select:hover {
+  border-color: var(--border-strong);
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.llm-settings-card .card-title-inline {
+  font-size: 14px;
+  margin-bottom: 0;
+}
+
+.card-sub-tight {
+  margin: 2px 0 12px;
+}
+
+.llm-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  align-items: end;
+}
+
+.llm-settings-key {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 720px) {
+  .llm-settings-grid {
+    grid-template-columns: 1fr 1fr 1.25fr;
+  }
+
+  .llm-settings-key {
+    grid-column: auto;
+  }
+}
+
 .form-grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -688,6 +741,19 @@ body {
 
 .disclosure[open] .disclosure-chevron {
   transform: rotate(45deg);
+}
+
+.enrich-confidence {
+  margin-left: 0.5rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.enrich-raw-sources {
+  margin-top: 12px;
 }
 
 /* ——— Briefing ——— */

@@ -1,0 +1,52 @@
+> concurrently -n server,client -c blue,green "npm run dev --prefix server" "n
+> concurrently -n server,client -c blue,green "npm run dev --prefix server" "npm run dev --prefix client"
+
+[server] 
+[server] > dev
+[server] > node --watch index.js
+[server] 
+[client] 
+[client] > dev
+[client] > vite
+[client] 
+[server] [meeting_prep_prototype] Loaded env from /Users/naamadayan/Downloads/
+[server] [meeting_prep_prototype] Loaded env from /Users/naamadayan/Downloads/meeting_prep_new/meeting_prep_prototype/server/.env
+[server] node:events:486
+[server]       throw er; // Unhandled 'error' event
+[server]       ^
+[server] 
+[server] Error: listen EADDRINUSE: address already in use :::3851
+[server]     at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+[server]     at listenInCluster (node:net:2005:12)
+[server]     at Server.listen (node:net:2110:7)
+[server]     at app.listen (/Users/naamadayan/Downloads/meeting_prep_new/meeti
+[server]     at app.listen (/Users/naamadayan/Downloads/meeting_prep_new/meeting_prep_prototype/server/node_modules/express/lib/application.js:635:24)
+[server]     at file:///Users/naamadayan/Downloads/meeting_prep_new/meeting_pr
+[server]     at file:///Users/naamadayan/Downloads/meeting_prep_new/meeting_prep_prototype/server/index.js:9:5
+[server]     at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+[server]     at process.processTicksAndRejections (node:internal/process/task_
+[server]     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[server]     at async onImport.tracePromise.__proto__ (node:internal/modules/e
+[server]     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+[server]     at async asyncRunEntryPointWithESMLoader (node:internal/modules/r
+[server]     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+[server] Emitted 'error' event on Server instance at:
+[server]     at emitErrorNT (node:net:1984:8)
+[server]     at process.processTicksAndRejections (node:internal/process/task_
+[server]     at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+[server]   code: 'EADDRINUSE',
+[server]   errno: -48,
+[server]   syscall: 'listen',
+[server]   address: '::',
+[server]   port: 3851
+[server] }
+[server] 
+[server] Node.js v24.14.0
+[server] Failed running 'index.js'. Waiting for file changes before restarting
+[server] Failed running 'index.js'. Waiting for file changes before restarting...
+[client] 
+[client]   VITE v5.4.21  ready in 183 ms
+[client] 
+[client]   ➜  Local:   http://localhost:5174/
+[client]   ➜  Network: use --host to expose
+^C[client] npm run dev --prefix client exited with code SIGINT

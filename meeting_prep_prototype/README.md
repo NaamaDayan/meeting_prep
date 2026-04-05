@@ -13,6 +13,10 @@ Open **http://localhost:5174**. The prototype API listens on **http://127.0.0.1:
 
 Without `OPENAI_API_KEY`, the server returns a fixed mock briefing JSON so the UI can be exercised end-to-end.
 
-**Sanity check:** open **http://localhost:5174/health** (via Vite proxy). You should see `"service":"meeting_prep_prototype"`, `"version":2`, and `"openai_configured":true`. If you only see `{"ok":true}` or the wrong `service`, the browser is not reaching this prototype API (wrong port or old process).
+**Sanity check:** open **http://localhost:5174/health** (via Vite proxy). You should see `"service":"meeting_prep_prototype"`, `"version":3`, and `"openai_configured":true`. If you only see `{"ok":true}` or the wrong `service`, the browser is not reaching this prototype API (wrong port or old process).
 
 **If the key is in `server/.env` but you still see the mock:** ensure `openai_configured` is true on that health JSON. The server logs `Loaded env from …` and whether the OpenAI key was found when it starts.
+
+## Deploy to AWS (Lambda + S3)
+
+See **[DEPLOY_AWS.md](./DEPLOY_AWS.md)** for packaging the API for Lambda, API Gateway, S3 static hosting, and how **local** vs **remote** configuration differs (`VITE_API_BASE_URL` only for production builds).

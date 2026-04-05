@@ -62,9 +62,15 @@ $("ping").addEventListener("click", async () => {
     const r = await fetch(`${base}/health`, { method: "GET" });
     const body = await r.text();
     const diag = { ok: r.ok, status: r.status, body: body.slice(0, 2000) };
+    if (!r.ok && r.status === 403 && body.includes("forbidden_origin")) {
+      diag.hint =
+        "CORS: add this browser’s chrome-extension://… origin (see “This extension’s ID” above) to CORS_ALLOWED_ORIGINS on AWS, redeploy, then ping again.";
+    }
     await chrome.storage.sync.set({ meetingPrepLastDiag: diag });
     $("diag").textContent = JSON.stringify(diag, null, 2);
-    $("status").textContent = r.ok ? "Server reachable." : `HTTP ${r.status}`;
+    let statusLine = r.ok ? "Server reachable." : `HTTP ${r.status}`;
+    if (diag.hint) statusLine += ` — ${diag.hint}`;
+    $("status").textContent = statusLine;
     $("status").className = r.ok ? "ok" : "err";
   } catch (e) {
     const diag = { error: String(e?.message || e) };

@@ -3,7 +3,9 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -n server,client -c blue,green \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
-    "setup": "npm install && npm install --prefix server && npm install --prefix client"
+    "setup": "npm install && npm install --prefix server && npm install --prefix client",
+    "build:client": "npm run build --prefix client",
+    "package:lambda": "bash scripts/package-lambda.sh"
   },
   "devDependencies": {
     "concurrently": "^9.0.1"

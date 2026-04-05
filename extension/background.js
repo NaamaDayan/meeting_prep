@@ -77,8 +77,8 @@ async function fetchUserIdentity(accessToken) {
  * with Authorized redirect URI = chrome.identity.getRedirectURL() exactly.
  */
 async function getGmailWebOAuthClientId() {
-  const { meetingPrepGmailWebClientId } = await chrome.storage.sync.get("meetingPrepGmailWebClientId");
-  const id = String(meetingPrepGmailWebClientId || "").trim();
+  const cfg = await MeetingPrepConfig.load();
+  const id = String(cfg.gmailWebClientId || "").trim();
   if (id) return id;
   return chrome.runtime.getManifest().oauth2.client_id;
 }
@@ -264,12 +264,30 @@ function mergeParticipants(domList, apiList, organizerEmail) {
   return out;
 }
 
-async function calFetch(path, accessToken, init) {
+/** Avoid hanging prep forever when a Calendar HTTP call never completes (no Lambda logs = never reached serverFetch). */
+const CALENDAR_FETCH_TIMEOUT_MS = 18000;
+const MAX_CALENDARS_EVENTS_GET = 24;
+const MAX_CALENDARS_EVENTS_LIST = 16;
+const RESOLVE_CALENDAR_EVENT_MS = 32000;
+
+function calendarFetchSignal(existing) {
+  if (existing) return existing;
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(CALENDAR_FETCH_TIMEOUT_MS);
+  }
+  const c = new AbortController();
+  setTimeout(() => c.abort(), CALENDAR_FETCH_TIMEOUT_MS);
+  return c.signal;
+}
+
+async function calFetch(path, accessToken, init = {}) {
   const url = path.startsWith("http") ? path : `https://www.googleapis.com/calendar/v3${path}`;
+  const { signal: passedSignal, ...rest } = init;
   const r = await fetch(url, {
-    ...init,
+    ...rest,
+    signal: calendarFetchSignal(passedSignal),
     headers: {
-      ...(init && init.headers),
+      ...(rest && rest.headers),
       Authorization: `Bearer ${accessToken}`,
     },
   });
@@ -301,7 +319,10 @@ async function listEventsWindow(accessToken, calendarId, timeMinIso, timeMaxIso,
   u.searchParams.set("orderBy", "startTime");
   u.searchParams.set("maxResults", "80");
   if (q) u.searchParams.set("q", q);
-  const r = await fetch(u.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
+  const r = await fetch(u.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: calendarFetchSignal(),
+  });
   if (!r.ok) throw new Error(`events.list failed: ${r.status}`);
   const j = await r.json();
   return j.items || [];
@@ -407,8 +428,9 @@ async function resolveCalendarEvent(accessToken, calendarIdHint, eventId, snapsh
   } catch {
     cals = [];
   }
+  const calsLimited = cals.slice(0, MAX_CALENDARS_EVENTS_GET);
   const seen = new Set(tryIds);
-  for (const c of cals) {
+  for (const c of calsLimited) {
     const id = c.id;
     if (!id || seen.has(id)) continue;
     seen.add(id);
@@ -424,7 +446,8 @@ async function resolveCalendarEvent(accessToken, calendarIdHint, eventId, snapsh
   const title = snapshot?.title || "";
   const emails = snapshot?.attendeeEmails || [];
 
-  for (const c of [{ id: "primary" }, ...cals]) {
+  const calsForList = [{ id: "primary" }, ...calsLimited.slice(0, MAX_CALENDARS_EVENTS_LIST)];
+  for (const c of calsForList) {
     const calId = c.id || "primary";
     let items = [];
     try {
@@ -731,7 +754,16 @@ async function getOrganizerEmailFallback() {
   });
 }
 
-async function handlePrepMeeting(payload) {
+const PREP_MEETING_TIMEOUT_MS = 115000;
+
+function withTimeout(promise, ms, errMessage) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(errMessage)), ms)),
+  ]);
+}
+
+async function handlePrepMeetingInner(payload) {
   const accessToken = await getAuthTokenPreferCached();
 
   const calendarEventId = payload.calendarEventId || null;
@@ -741,11 +773,26 @@ async function handlePrepMeeting(payload) {
   let resolvedEventId = calendarEventId;
 
   if (calendarEventId) {
-    const { event } = await resolveCalendarEvent(accessToken, calendarId, calendarEventId, {
+    const snap = {
       title: payload.title,
       startIso: payload.startIso,
       attendeeEmails: (payload.attendees || []).map((a) => a.email).filter(Boolean),
-    });
+    };
+    const raceResult = await Promise.race([
+      resolveCalendarEvent(accessToken, calendarId, calendarEventId, snap).then((r) => ({ ...r, timedOut: false })),
+      new Promise((resolve) =>
+        setTimeout(
+          () => resolve({ event: null, calendarId: calendarId || "primary", timedOut: true }),
+          RESOLVE_CALENDAR_EVENT_MS
+        )
+      ),
+    ]);
+    if (raceResult.timedOut) {
+      console.warn(
+        "Meeting Prep: Calendar resolution exceeded time budget; calling API with DOM snapshot only (check many/hung calendars)."
+      );
+    }
+    const { event } = raceResult;
     if (event) {
       resolvedEventId = event.id || calendarEventId;
       apiAttendees = (event.attendees || []).map((a) => ({
@@ -798,6 +845,22 @@ async function handlePrepMeeting(payload) {
   }
 
   if (!r.ok) {
+    if (r.status === 403 && data.error === "forbidden_origin") {
+      const extId = (() => {
+        try {
+          return chrome.runtime.id || "";
+        } catch {
+          return "";
+        }
+      })();
+      const originHint = extId ? `chrome-extension://${extId}` : "chrome-extension://<this-extension-id>";
+      return {
+        ok: false,
+        status: 403,
+        error: "cors_forbidden",
+        message: `API blocked this extension (CORS). Add ${originHint} to the server environment variable CORS_ALLOWED_ORIGINS on AWS (comma-separated if you already have other origins), then redeploy. Each unpacked browser or PC often has a different extension ID — use Meeting Prep → Options → “This extension’s ID”.`,
+      };
+    }
     return {
       ok: false,
       status: r.status,
@@ -831,6 +894,27 @@ async function handlePrepMeeting(payload) {
   }
 
   return { ok: true, ...data };
+}
+
+async function handlePrepMeeting(payload) {
+  try {
+    return await withTimeout(
+      handlePrepMeetingInner(payload),
+      PREP_MEETING_TIMEOUT_MS,
+      "prep_timeout_background"
+    );
+  } catch (e) {
+    const msg = String(e?.message || e);
+    if (msg === "prep_timeout_background") {
+      return {
+        ok: false,
+        error: "prep_timeout",
+        message:
+          "Prep took too long. If Lambda shows no logs, Google Calendar calls were likely stalling (fixed in latest extension: reload it). Otherwise check CORS, Production backend URL, Lambda/OpenAI logs, and reload the service worker.",
+      };
+    }
+    return { ok: false, error: "prep_failed", message: msg };
+  }
 }
 
 async function handleAutoSync(payload) {

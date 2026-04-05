@@ -2652,6 +2652,14 @@
         alert(res.message || "Extension was updated. Refresh this page.");
         return;
       }
+      if (res && res.error === "cors_forbidden") {
+        alert(res.message || "Server CORS blocked this extension. Add your chrome-extension:// ID in AWS CORS_ALLOWED_ORIGINS.");
+        return;
+      }
+      if (res && (res.error === "prep_timeout" || res.error === "prep_failed")) {
+        alert(res.message || res.error || "Prep failed.");
+        return;
+      }
       alert(res?.message || res?.error || "Prep failed. Check backend URL and Google sign-in.");
       return;
     }

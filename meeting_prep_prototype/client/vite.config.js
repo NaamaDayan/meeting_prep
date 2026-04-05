@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    /** VITE_* loaded from client/; MEETING_PREP_PROTOTYPE_* from ../server for proxy port only */
     server: {
       port: 5174,
       proxy: {
